@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
@@ -139,7 +140,8 @@ func GetKeypoints(c *gin.Context) {
 	}
 
 	collection := database.GetCollection("keypoints")
-	cursor, err := collection.Find(context.Background(), bson.M{"tourId": tourObjId})
+	findOpts := options.Find().SetSort(bson.M{"createdAt": 1})
+	cursor, err := collection.Find(context.Background(), bson.M{"tourId": tourObjId}, findOpts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch keypoints"})
 		return
@@ -150,6 +152,16 @@ func GetKeypoints(c *gin.Context) {
 	if err = cursor.All(context.Background(), &keypoints); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse keypoints"})
 		return
+	}
+
+	userId := extractUserIdFromToken(c.GetHeader("Authorization"))
+	isAuthor := userId != 0 && userId == tour.AuthorId
+	isPurchased := userId != 0 && IsTourPurchasedByTourist(userId, tourObjId)
+
+	if !isAuthor && !isPurchased {
+		if len(keypoints) > 1 {
+			keypoints = keypoints[:1]
+		}
 	}
 
 	c.JSON(http.StatusOK, keypoints)

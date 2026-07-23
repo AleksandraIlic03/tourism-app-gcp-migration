@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import api from '../api';
 import './Auth.scss';
 
@@ -14,8 +15,18 @@ export default function Register() {
     try {
       await api.post('/auth/register', form);
       navigate('/login');
-    } catch {
-      setError('Username or email already exists');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          // Backend responded — surface its actual message (e.g. real 409 conflict)
+          setError(err.response.data?.error || `Registration failed (${err.response.status})`);
+        } else {
+          // Request never reached the backend at all
+          setError('Cannot reach the server. Is the backend running?');
+        }
+      } else {
+        setError('Unexpected error during registration');
+      }
     }
   };
 
