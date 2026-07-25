@@ -18,10 +18,9 @@ export default function Register() {
     } catch (err) {
       if (axios.isAxiosError(err)) {
         if (err.response) {
-          // Backend responded — surface its actual message (e.g. real 409 conflict)
+         
           setError(err.response.data?.error || `Registration failed (${err.response.status})`);
         } else {
-          // Request never reached the backend at all
           setError('Cannot reach the server. Is the backend running?');
         }
       } else {

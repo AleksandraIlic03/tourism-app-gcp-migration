@@ -26,12 +26,29 @@
 .blog-page {
   max-width: 100%;
   margin: 40px 0;
-  padding: 0 60px;
+  padding: 0 60px 80px;
 
   h2 {
     margin-top: 20px;
     margin-bottom: 24px;
   }
+}
+
+.blog-form-card {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.blog-form-header {
+  margin-bottom: 28px;
+
+  h2 { margin: 0 0 6px; }
+}
+
+.blog-form-subtitle {
+  font-size: 13.5px;
+  color: $color-text-secondary;
+  margin: 0;
 }
 
 .blog-header {
@@ -79,6 +96,8 @@
   h3 {
     font-size: 22px;
     margin-bottom: 4px;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   .blog-meta {
@@ -90,19 +109,69 @@
   .blog-content {
     font-size: 15px;
     line-height: 1.6;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   .blog-images {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     margin-top: 16px;
     flex-wrap: wrap;
-
-    img {
-      max-width: 200px;
-      border-radius: 8px;
-    }
   }
+}
+
+// List cards clamp the title and body so a long post reads as a preview,
+// not the entire text dumped inline; the detail page (.blog-card without
+// this modifier) still renders the full thing.
+.blog-card--preview {
+  .blog-card-content h3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .blog-card-content .blog-content {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+.blog-image-thumb {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  flex-shrink: 0;
+  border-radius: $radius-sm;
+  overflow: hidden;
+  cursor: zoom-in;
+  border: 1px solid $color-divider-solid;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover img { transform: scale(1.06); }
+}
+
+.blog-image-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 15, 10, 0.55);
+  color: white;
+  font-family: $font-heading;
+  font-weight: 600;
+  font-size: 18px;
 }
 
 .blog-card-sidebar {
@@ -116,33 +185,83 @@
 .preview-toggle {
   margin-left: 12px;
   font-size: 12px;
+  font-weight: 600;
   color: $color-accent-orange;
-  background: none;
+  background: $color-accent-gray-pale;
   border: none;
+  border-radius: 999px;
+  padding: 3px 12px;
   cursor: pointer;
   font-family: $font-heading;
+  transition: background 0.15s ease;
+
+  &:hover { background: rgba(244, 95, 0, 0.12); }
 }
 
 .markdown-preview {
   border: 1px solid $color-divider-solid;
-  border-radius: 4px;
-  padding: 16px;
+  border-radius: $radius-sm;
+  background: $color-bg-page;
+  padding: 16px 20px;
   min-height: 200px;
   font-size: 15px;
   line-height: 1.6;
 }
 
+// Rendered Markdown lives inline in the page (post detail, preview) — cap
+// heading sizes here so a stray "# Heading" in someone's post doesn't blow
+// up to the same 45px used for real page titles.
+.markdown-preview, .blog-content {
+  h1 { font-size: 22px; margin: 12px 0 8px; }
+  h2 { font-size: 19px; margin: 12px 0 8px; }
+  h3 { font-size: 16px; margin: 10px 0 6px; }
+  p { margin-bottom: 10px; }
+  ul, ol { margin: 0 0 10px 20px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: $font-mono;
+    font-size: 13px;
+    background: $color-accent-gray-pale;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  blockquote {
+    border-left: 3px solid $color-accent-orange;
+    margin: 10px 0;
+    padding: 2px 16px;
+    color: $color-text-secondary;
+  }
+  a { color: $color-accent-orange; }
+}
+
 textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 12px;
   font-size: 15px;
   font-family: $font-body;
   border: 1px solid $color-divider-solid;
-  border-radius: 4px;
+  border-radius: $radius-sm;
   outline: none;
   resize: vertical;
+  background: $color-bg;
 
-  &:focus { border-color: $color-text-dark; }
+  &:focus {
+    border-color: $color-accent-orange;
+    box-shadow: 0 0 0 3px rgba(244, 95, 0, 0.1);
+  }
+}
+
+.image-upload-box {
+  border: 1px dashed $color-border;
+  border-radius: $radius-sm;
+  background: $color-bg-page;
+  padding: 16px;
+}
+
+.image-upload-hint {
+  font-size: 12px;
+  color: $color-text-muted;
+  margin: 8px 0 0;
 }
 
 .image-previews {
@@ -191,6 +310,24 @@ textarea {
   margin-bottom: 24px;
 
   &:hover { color: $color-text-dark; }
+}
+
+.blog-submit-btn {
+  display: block;
+  width: auto;
+  padding: 11px 28px;
+  margin: 24px auto 0;
+  font-family: $font-heading;
+  font-weight: 500;
+  font-size: 14px;
+  background: $color-text-dark;
+  color: $color-bg;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  box-shadow: $shadow-sm;
+
+  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: $shadow-md; }
 }
 
 .comments-section {

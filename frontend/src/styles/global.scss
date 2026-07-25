@@ -12,7 +12,7 @@
 body {
   font-family: $font-body;
   color: $color-text-primary;
-  background: $color-bg;
+  background: $color-bg-page;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -20,7 +20,7 @@ a {
   @extend .link;
 }
 
-input, button, textarea {
+input, button, textarea, select {
   font-family: $font-body;
 }
 
@@ -28,4 +28,65 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+input, textarea, select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+::selection {
+  background: rgba(244, 95, 0, 0.18);
+}
+
+input[type="file"] {
+  font-family: $font-body;
+  font-size: 13px;
+  color: $color-text-secondary;
+  cursor: pointer;
+
+  &::file-selector-button,
+  &::-webkit-file-upload-button {
+    font-family: $font-heading;
+    font-size: 12px;
+    font-weight: 500;
+    color: $color-text-dark;
+    background: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    padding: 7px 14px;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  &:hover::file-selector-button,
+  &:hover::-webkit-file-upload-button {
+    border-color: $color-text-dark;
+    background: $color-accent-gray-pale;
+  }
+}
+
+/* Slimmer, brand-tinted scrollbar (WebKit + Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.28);
+  }
 }

@@ -45,6 +45,7 @@ export default function BlogDetail() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [hasLiked, setHasLiked] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const token = localStorage.getItem('token');
   const currentUserId = token ? JSON.parse(atob(token.split('.')[1])).id : null;
@@ -127,7 +128,9 @@ export default function BlogDetail() {
               {blog.images.length > 0 && (
                 <div className="blog-images">
                   {blog.images.map((url, i) => (
-                    <img key={i} src={url} alt={`blog-img-${i}`} />
+                    <div key={i} className="blog-image-thumb" onClick={() => setLightboxSrc(url)}>
+                      <img src={url} alt={`blog-img-${i}`} />
+                    </div>
                   ))}
                 </div>
               )}
@@ -215,6 +218,11 @@ export default function BlogDetail() {
           )}
         </div>
       </div>
+      {lightboxSrc && (
+        <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
+          <img className="lightbox-img" src={lightboxSrc} alt="preview" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </>
   );
 }
