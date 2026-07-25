@@ -561,9 +561,9 @@ func main() {
 	toursHTTP := getEnv("TOUR_SERVICE_URL", "http://tour-service:8083")
 	follower := getEnv("FOLLOWER_SERVICE_URL", "http://follower-service:8084")
 	payment := getEnv("PAYMENT_SERVICE_URL", "http://payment-service:8086")
-	toursGRPC := getEnv("TOUR_SERVICE_GRPC_URL", "tour-service:9090")
-	paymentGRPCAddr := getEnv("PAYMENT_SERVICE_GRPC_URL", "payment-service:9091")
-	followerGRPCAddr := getEnv("FOLLOWER_SERVICE_GRPC_URL", "follower-service:9084")
+	toursGRPC := getEnv("TOUR_SERVICE_GRPC_URL", "tour-service:8083")
+	paymentGRPCAddr := getEnv("PAYMENT_SERVICE_GRPC_URL", "payment-service:8086")
+	followerGRPCAddr := getEnv("FOLLOWER_SERVICE_GRPC_URL", "follower-service:8084")
 
 	stakeholdersProxy := newReverseProxy(stakeholders)
 	blogProxy := newReverseProxy(blog)

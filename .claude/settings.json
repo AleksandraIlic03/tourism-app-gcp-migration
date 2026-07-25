@@ -4,7 +4,9 @@
       "Bash(node_modules/.bin/sass --no-source-map src/pages/blog/Blog.scss /tmp/blogcheck6.css)",
       "Bash(node_modules/.bin/sass --no-source-map src/pages/tour/Tour.scss /tmp/tourcheck2.css)",
       "Bash(node_modules/.bin/sass --no-source-map src/pages/tour/Tour.scss /tmp/tourcheck4.css)",
-      "Bash(node_modules/.bin/sass --no-source-map src/pages/tour/Tour.scss /tmp/tourcheck6.css)"
+      "Bash(node_modules/.bin/sass --no-source-map src/pages/tour/Tour.scss /tmp/tourcheck6.css)",
+      "Bash(go get *)",
+      "Bash(echo \"follower-service EXIT:$?\")"
     ]
   }
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"tour-service/database"
 	"tour-service/handlers"
@@ -11,6 +12,7 @@ import (
 	"tour-service/tracing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -28,30 +30,6 @@ func main() {
 	}()
 
 	tracer := otel.Tracer("tour-service")
-
-	// ---- gRPC server ----
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "9090"
-	}
-
-	lis, err := net.Listen("tcp", ":"+grpcPort)
-	if err != nil {
-		log.Fatalf("Failed to listen on gRPC port %s: %v", grpcPort, err)
-	}
-
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(otelGrpcUnaryInterceptor(tracer)),
-	)
-	reflection.Register(grpcServer)
-	proto.RegisterTourServiceServer(grpcServer, &TourGrpcServer{})
-
-	go func() {
-		log.Printf("gRPC server listening on :%s", grpcPort)
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
-		}
-	}()
 
 	go StartNATSSubscriber()
 
@@ -108,11 +86,40 @@ func main() {
 		internal.GET("/check-purchase", handlers.CheckPurchase)
 	}
 
-	httpPort := os.Getenv("PORT")
-	if httpPort == "" {
-		httpPort = "8083"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8083"
 	}
 
-	log.Printf("HTTP server listening on :%s", httpPort)
-	r.Run(":" + httpPort)
+	lis, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("Failed to listen on port %s: %v", port, err)
+	}
+
+	m := cmux.New(lis)
+	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+	httpL := m.Match(cmux.HTTP1Fast())
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(otelGrpcUnaryInterceptor(tracer)),
+	)
+	reflection.Register(grpcServer)
+	proto.RegisterTourServiceServer(grpcServer, &TourGrpcServer{})
+
+	go func() {
+		if err := grpcServer.Serve(grpcL); err != nil {
+			log.Printf("gRPC server stopped: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := http.Serve(httpL, r); err != nil {
+			log.Printf("HTTP server stopped: %v", err)
+		}
+	}()
+
+	log.Printf("Listening on :%s (HTTP + gRPC multiplexed)", port)
+	if err := m.Serve(); err != nil {
+		log.Fatalf("cmux serve error: %v", err)
+	}
 }

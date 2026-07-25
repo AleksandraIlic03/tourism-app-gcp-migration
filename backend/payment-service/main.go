@@ -3,35 +3,20 @@ package main
 import (
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"payment-service/database"
 	"payment-service/handlers"
 	pb "payment-service/proto"
 
 	"github.com/gin-gonic/gin"
+	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	database.Connect()
 	initNATS()
-
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "9091"
-	}
-	lis, err := net.Listen("tcp", ":"+grpcPort)
-	if err != nil {
-		log.Fatalf("gRPC listen failed: %v", err)
-	}
-	grpcServer := grpc.NewServer()
-	pb.RegisterPaymentServiceServer(grpcServer, &paymentGrpcServer{})
-	go func() {
-		log.Printf("Payment gRPC server listening on :%s", grpcPort)
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
-		}
-	}()
 
 	// ---- HTTP server (Gin) ----
 	r := gin.Default()
@@ -62,6 +47,32 @@ func main() {
 		port = "8086"
 	}
 
-	log.Printf("Payment HTTP server listening on :%s", port)
-	r.Run(":" + port)
+	lis, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("Failed to listen on port %s: %v", port, err)
+	}
+
+	m := cmux.New(lis)
+	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+	httpL := m.Match(cmux.HTTP1Fast())
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterPaymentServiceServer(grpcServer, &paymentGrpcServer{})
+
+	go func() {
+		if err := grpcServer.Serve(grpcL); err != nil {
+			log.Printf("gRPC server stopped: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := http.Serve(httpL, r); err != nil {
+			log.Printf("HTTP server stopped: %v", err)
+		}
+	}()
+
+	log.Printf("Listening on :%s (HTTP + gRPC multiplexed)", port)
+	if err := m.Serve(); err != nil {
+		log.Fatalf("cmux serve error: %v", err)
+	}
 }

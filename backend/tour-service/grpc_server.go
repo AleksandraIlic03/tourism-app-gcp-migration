@@ -130,7 +130,7 @@ func (s *TourGrpcServer) PublishTour(ctx context.Context, req *proto.PublishTour
 func getPaymentClient() (proto.PaymentServiceGrpcClient, *grpc.ClientConn, error) {
 	addr := os.Getenv("PAYMENT_GRPC_ADDR")
 	if addr == "" {
-		addr = "payment-service:9091"
+		addr = "payment-service:8086"
 	}
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

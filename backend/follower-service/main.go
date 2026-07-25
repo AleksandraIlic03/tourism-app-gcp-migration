@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -33,25 +34,6 @@ func main() {
 	tracer := otel.Tracer("follower-service")
 
 	repo := repository.NewFollowerRepository(database.Driver)
-
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "9084"
-	}
-	lis, err := net.Listen("tcp", ":"+grpcPort)
-	if err != nil {
-		log.Fatalf("gRPC listen failed: %v", err)
-	}
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(otelGrpcUnaryInterceptorFollower(tracer)),
-	)
-	proto.RegisterFollowerServiceServer(grpcServer, NewFollowerGrpcServer(repo))
-	go func() {
-		log.Printf("Follower gRPC server listening on :%s", grpcPort)
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
-		}
-	}()
 
 	h := handler.NewFollowerHandler(repo)
 
@@ -86,11 +68,39 @@ func main() {
 
 	corsHandler := c.Handler(router)
 
-	httpPort := os.Getenv("PORT")
-	if httpPort == "" {
-		httpPort = "8084"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8084"
 	}
 
-	log.Printf("Follower HTTP server listening on :%s", httpPort)
-	log.Fatal(http.ListenAndServe(":"+httpPort, corsHandler))
+	lis, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("Failed to listen on port %s: %v", port, err)
+	}
+
+	m := cmux.New(lis)
+	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+	httpL := m.Match(cmux.HTTP1Fast())
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(otelGrpcUnaryInterceptorFollower(tracer)),
+	)
+	proto.RegisterFollowerServiceServer(grpcServer, NewFollowerGrpcServer(repo))
+
+	go func() {
+		if err := grpcServer.Serve(grpcL); err != nil {
+			log.Printf("gRPC server stopped: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := http.Serve(httpL, corsHandler); err != nil {
+			log.Printf("HTTP server stopped: %v", err)
+		}
+	}()
+
+	log.Printf("Listening on :%s (HTTP + gRPC multiplexed)", port)
+	if err := m.Serve(); err != nil {
+		log.Fatalf("cmux serve error: %v", err)
+	}
 }
