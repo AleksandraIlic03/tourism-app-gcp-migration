@@ -2,15 +2,16 @@ package main
 
 import (
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"payment-service/database"
 	"payment-service/handlers"
 	pb "payment-service/proto"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/soheilhy/cmux"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 )
 
@@ -47,32 +48,24 @@ func main() {
 		port = "8086"
 	}
 
-	lis, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		log.Fatalf("Failed to listen on port %s: %v", port, err)
-	}
-
-	m := cmux.New(lis)
-	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
-	httpL := m.Match(cmux.HTTP1Fast())
-
 	grpcServer := grpc.NewServer()
 	pb.RegisterPaymentServiceServer(grpcServer, &paymentGrpcServer{})
 
-	go func() {
-		if err := grpcServer.Serve(grpcL); err != nil {
-			log.Printf("gRPC server stopped: %v", err)
+	mixedHandler := func(w http.ResponseWriter, req *http.Request) {
+		if req.ProtoMajor == 2 && strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
+			grpcServer.ServeHTTP(w, req)
+			return
 		}
-	}()
+		r.ServeHTTP(w, req)
+	}
 
-	go func() {
-		if err := http.Serve(httpL, r); err != nil {
-			log.Printf("HTTP server stopped: %v", err)
-		}
-	}()
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: h2c.NewHandler(http.HandlerFunc(mixedHandler), &http2.Server{}),
+	}
 
-	log.Printf("Listening on :%s (HTTP + gRPC multiplexed)", port)
-	if err := m.Serve(); err != nil {
-		log.Fatalf("cmux serve error: %v", err)
+	log.Printf("Listening on :%s (HTTP + gRPC on one handler)", port)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("server error: %v", err)
 	}
 }

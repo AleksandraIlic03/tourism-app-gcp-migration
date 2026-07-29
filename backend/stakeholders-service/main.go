@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"stakeholders-service/database"
 	"stakeholders-service/handlers"
 
@@ -55,5 +56,9 @@ func main() {
 	r.GET("/api/position/:userId", handlers.GetUserPosition)
 	r.GET("/internal/users/:id/blocked", handlers.GetUserBlockedStatus)
 
-	r.Run(":8081")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+	r.Run(":" + port)
 }

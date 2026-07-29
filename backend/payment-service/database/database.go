@@ -28,7 +28,7 @@ func Connect() {
 	}
 
 	Client = client
-	DB = client.Database("tours_db")
+	DB = client.Database("payment_db")
 	log.Println("Connected to MongoDB!")
 }
 

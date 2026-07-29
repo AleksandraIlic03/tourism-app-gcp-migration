@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,9 +19,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 
+	"crypto/tls"
+
 	"api-gateway/proto"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -29,6 +33,13 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func grpcTransportCredentials() credentials.TransportCredentials {
+	if os.Getenv("GRPC_TLS_ENABLED") == "true" {
+		return credentials.NewTLS(&tls.Config{})
+	}
+	return insecure.NewCredentials()
 }
 
 func verifyJWT(tokenString string, secret []byte) (map[string]interface{}, error) {
@@ -183,6 +194,21 @@ func newReverseProxy(target string) *httputil.ReverseProxy {
 		log.Fatalf("Invalid target URL %s: %v", target, err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+	defaultDirector := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		defaultDirector(r)
+
+		r.Host = targetURL.Host
+
+		if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			r.Header.Set("X-Forwarded-For", clientIP)
+		} else {
+			r.Header.Del("X-Forwarded-For")
+		}
+		r.Header.Del("Forwarded")
+	}
+
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("Proxy error for %s: %v", r.URL.Path, err)
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
@@ -338,15 +364,15 @@ func handleStartExecutionGRPC(w http.ResponseWriter, r *http.Request, client pro
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":              e.Id,
-		"tourId":          e.TourId,
-		"touristId":       e.TouristId,
-		"touristUsername": e.TouristUsername,
-		"status":          e.Status,
-		"startedAt":       e.StartedAt,
-		"lastActivity":    e.LastActivity,
-		"currentLat":      e.CurrentLat,
-		"currentLng":      e.CurrentLng,
+		"id":                 e.Id,
+		"tourId":             e.TourId,
+		"touristId":          e.TouristId,
+		"touristUsername":    e.TouristUsername,
+		"status":             e.Status,
+		"startedAt":          e.StartedAt,
+		"lastActivity":       e.LastActivity,
+		"currentLat":         e.CurrentLat,
+		"currentLng":         e.CurrentLng,
 		"completedKeypoints": e.CompletedKeypoints,
 	})
 }
@@ -385,16 +411,16 @@ func handleGetExecutionGRPC(w http.ResponseWriter, r *http.Request, client proto
 	e := resp.Execution
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":              e.Id,
-		"tourId":          e.TourId,
-		"touristId":       e.TouristId,
-		"touristUsername": e.TouristUsername,
-		"status":          e.Status,
-		"startedAt":       e.StartedAt,
-		"endedAt":         e.EndedAt,
-		"lastActivity":    e.LastActivity,
-		"currentLat":      e.CurrentLat,
-		"currentLng":      e.CurrentLng,
+		"id":                 e.Id,
+		"tourId":             e.TourId,
+		"touristId":          e.TouristId,
+		"touristUsername":    e.TouristUsername,
+		"status":             e.Status,
+		"startedAt":          e.StartedAt,
+		"endedAt":            e.EndedAt,
+		"lastActivity":       e.LastActivity,
+		"currentLat":         e.CurrentLat,
+		"currentLng":         e.CurrentLng,
 		"completedKeypoints": e.CompletedKeypoints,
 	})
 }
@@ -573,7 +599,7 @@ func main() {
 
 	conn, err := grpc.NewClient(
 		toursGRPC,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to tour-service gRPC: %v", err)
@@ -584,7 +610,7 @@ func main() {
 
 	paymentGrpcConn, err := grpc.NewClient(
 		paymentGRPCAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to payment-service gRPC: %v", err)
@@ -594,7 +620,7 @@ func main() {
 
 	followerGrpcConn, err := grpc.NewClient(
 		followerGRPCAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to follower-service gRPC: %v", err)
@@ -607,6 +633,22 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		log.Printf("%s %s", r.Method, path)
+
+		headerCount := 0
+		headerBytes := 0
+		for name, values := range r.Header {
+			headerCount += len(values)
+			for _, v := range values {
+				headerBytes += len(name) + len(v) + 4
+			}
+		}
+		log.Printf("DEBUG headers for %s %s: count=%d approxBytes=%d names=%v", r.Method, path, headerCount, headerBytes, func() []string {
+			names := make([]string, 0, len(r.Header))
+			for name := range r.Header {
+				names = append(names, name)
+			}
+			return names
+		}())
 
 		switch {
 		case strings.HasPrefix(path, "/api/auth/"),
