@@ -123,43 +123,71 @@ func jsonError(w http.ResponseWriter, code int, msg string) {
 func jsonUnauthorized(w http.ResponseWriter, msg string) { jsonError(w, http.StatusUnauthorized, msg) }
 func jsonForbidden(w http.ResponseWriter, msg string)    { jsonError(w, http.StatusForbidden, msg) }
 
+var allowedOrigins []string
+
+func resolveAllowedOrigins() []string {
+	raw := getEnv("ALLOWED_ORIGINS", "http://localhost:3000")
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
+}
+
+func originAllowed(origin string) bool {
+	for _, o := range allowedOrigins {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func setCORSHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin != "" && originAllowed(origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Max-Age", "3600")
+}
+
 type corsWriter struct {
 	http.ResponseWriter
+	req         *http.Request
 	wroteHeader bool
 }
 
-func (c *corsWriter) setCORS() {
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "*")
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+func (c *corsWriter) ensureCORS() {
+	if !c.wroteHeader {
+		setCORSHeaders(c.ResponseWriter, c.req)
+		c.wroteHeader = true
+	}
 }
 
 func (c *corsWriter) WriteHeader(status int) {
-	if !c.wroteHeader {
-		c.setCORS()
-		c.wroteHeader = true
-	}
+	c.ensureCORS()
 	c.ResponseWriter.WriteHeader(status)
 }
 
 func (c *corsWriter) Write(b []byte) (int, error) {
-	if !c.wroteHeader {
-		c.setCORS()
-		c.wroteHeader = true
-	}
+	c.ensureCORS()
 	return c.ResponseWriter.Write(b)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			setCORSHeaders(w, r)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		next.ServeHTTP(&corsWriter{ResponseWriter: w}, r)
+		next.ServeHTTP(&corsWriter{ResponseWriter: w, req: r}, r)
 	})
 }
 
@@ -579,6 +607,8 @@ func handleCheckoutGRPC(w http.ResponseWriter, r *http.Request, client proto.Pay
 }
 
 func main() {
+	allowedOrigins = resolveAllowedOrigins()
+
 	port := getEnv("PORT", "8080")
 	jwtSecret := []byte(getEnv("JWT_SECRET", "mysupersecretkey123"))
 
@@ -633,22 +663,6 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		log.Printf("%s %s", r.Method, path)
-
-		headerCount := 0
-		headerBytes := 0
-		for name, values := range r.Header {
-			headerCount += len(values)
-			for _, v := range values {
-				headerBytes += len(name) + len(v) + 4
-			}
-		}
-		log.Printf("DEBUG headers for %s %s: count=%d approxBytes=%d names=%v", r.Method, path, headerCount, headerBytes, func() []string {
-			names := make([]string, 0, len(r.Header))
-			for name := range r.Header {
-				names = append(names, name)
-			}
-			return names
-		}())
 
 		switch {
 		case strings.HasPrefix(path, "/api/auth/"),

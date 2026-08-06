@@ -31,9 +31,9 @@ export default function Simulator() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [, setCurrentLocation] = useState<Location | null>(null);
+  const [, setLoading] = useState(false);
+  const [, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;

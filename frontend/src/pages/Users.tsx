@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import './Users.scss';
 
@@ -36,12 +35,8 @@ function Users() {
   }, []);
 
   const fetchUsers = () => {
-    const token = localStorage.getItem('token');
-    fetch('http://localhost:8081/api/profile/api/users', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => { if (res.status === 403) throw new Error('Forbidden'); return res.json(); })
-      .then(data => setUsers(data ?? []))
+    api.get('/profile/api/users')
+      .then(res => setUsers(res.data ?? []))
       .catch(() => setError('Failed to load users.'));
   };
 

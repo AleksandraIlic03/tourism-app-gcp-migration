@@ -5,4 +5,4 @@ backend/stakeholders-service/.env
 backend/.idea
 uploads/
 frontend/.vite/
-.idea
+.idea.claude/

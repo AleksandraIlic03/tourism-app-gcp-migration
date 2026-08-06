@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api';
 import './UserManagement.scss';
 
 interface User {
@@ -19,15 +20,8 @@ function UserManagement() {
   const navigate = useNavigate();
 
   const fetchUsers = () => {
-    const token = localStorage.getItem('token');
-    fetch('http://localhost:8081/api/user_management/users', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 403) throw new Error('Forbidden');
-        return res.json();
-      })
-      .then((data) => setUsers(data ?? []))
+    api.get('/user_management/users')
+      .then((res) => setUsers(res.data ?? []))
       .catch(() => setError('You are not authorized to view this page.'));
   };
 
@@ -36,15 +30,8 @@ function UserManagement() {
   }, []);
 
   const toggleBlock = (id: number, currentlyBlocked: boolean) => {
-    const token = localStorage.getItem('token');
-    fetch(`http://localhost:8081/api/user_management/users/${id}/block`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ blocked: !currentlyBlocked }),
-    }).then(() => fetchUsers());
+    api.patch(`/user_management/users/${id}/block`, { blocked: !currentlyBlocked })
+      .then(() => fetchUsers());
   };
 
   const filteredUsers = users.filter((u) =>

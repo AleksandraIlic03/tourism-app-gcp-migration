@@ -40,18 +40,6 @@ interface Tour {
 const POLL_MS = 10_000;
 const RADIUS_M = 50;
 
-function getUserFromToken() {
-  const token = localStorage.getItem('token');
-  if (!token) return null;
-  try {
-    const parts = token.split('.');
-    const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(parts[1].length / 4) * 4, '=');
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-}
-
 const completedIcon = L.divIcon({
   html: `<svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
     <path d="M18 0C9.163 0 2 7.163 2 16c0 8.837 16 28 16 28S34 24.837 34 16C34 7.163 26.837 0 18 0z"
