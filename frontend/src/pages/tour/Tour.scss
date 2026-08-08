@@ -71,10 +71,14 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 8px;
+  gap: 12px;
 
   h3 {
     font-size: 22px;
     margin: 0;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 }
 
@@ -109,6 +113,8 @@
   color: $color-text-secondary;
   margin: 8px 0 0;
   line-height: 1.5;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tour-card--purchased {

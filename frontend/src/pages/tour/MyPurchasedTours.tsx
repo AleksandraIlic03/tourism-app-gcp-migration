@@ -78,7 +78,7 @@ export default function MyPurchasedTours() {
                 {tour && (
                   <>
                     <p className="tour-meta">Difficulty: {tour.difficulty}</p>
-                    <p>{tour.description}</p>
+                    <p className="tour-description">{tour.description}</p>
                     {tour.lengthKm !== undefined && tour.lengthKm > 0 && (
                       <p className="tour-meta">Length: {tour.lengthKm} km</p>
                     )}

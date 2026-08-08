@@ -235,6 +235,8 @@ func newReverseProxy(target string) *httputil.ReverseProxy {
 			r.Header.Del("X-Forwarded-For")
 		}
 		r.Header.Del("Forwarded")
+		r.Header.Del("Origin")
+		r.Header.Del("Referer")
 	}
 
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
