@@ -1,0 +1,7 @@
+# Kopiraj ovaj fajl u terraform.tfvars i popuni vrednosti
+# NIKAD ne commit-uj terraform.tfvars u git!
+
+project_id   = "tourism-app-migration"
+region       = "europe-west1"
+nats_vm_zone = "us-central1-a"
+nats_vm_ip   = "136.111.103.170"
