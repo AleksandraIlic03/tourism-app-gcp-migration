@@ -213,6 +213,11 @@ resource "google_cloud_run_v2_service" "follower_service" {
     containers {
       image = "europe-west1-docker.pkg.dev/tourism-app-migration/tourism-images/follower-service:v3"
 
+      ports {
+        name           = "h2c"
+        container_port = 8084
+      }
+
       env {
         name  = "NEO4J_URI"
         value = "neo4j+s://32771365.databases.neo4j.io"
@@ -242,6 +247,11 @@ resource "google_cloud_run_v2_service" "payment_service" {
   template {
     containers {
       image = "europe-west1-docker.pkg.dev/tourism-app-migration/tourism-images/payment-service:v1"
+
+      ports {
+        name           = "h2c"
+        container_port = 8086
+      }
 
       env {
         name = "MONGODB_URI"
@@ -327,6 +337,11 @@ resource "google_cloud_run_v2_service" "tour_service" {
   template {
     containers {
       image = "europe-west1-docker.pkg.dev/tourism-app-migration/tourism-images/tour-service:v1"
+
+      ports {
+        name           = "h2c"
+        container_port = 8083
+      }
 
       env {
         name  = "PAYMENT_GRPC_ADDR"
