@@ -9,25 +9,35 @@
   background: $color-bg;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06), 4px 0 24px rgba(20, 15, 10, 0.03);
   z-index: 10;
 }
 
 .sidebar-logo {
-  padding: 30px 32px;
+  padding: 28px 28px 22px;
   font-family: $font-heading;
   font-weight: 600;
   font-size: 16px;
   color: $color-text-dark;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid $color-divider-solid;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, $color-accent-orange, $color-accent-yellow);
+  }
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px 32px 30px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  gap: 4px;
+  padding: 18px 16px;
   flex: 1;
 }
 
@@ -35,15 +45,20 @@
   font-family: $font-heading;
   font-size: 13px;
   font-weight: 500;
-  color: $color-text-dark;
+  color: $color-text-secondary;
   text-decoration: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
   letter-spacing: -0.02em;
+  padding: 10px 14px;
+  border-radius: $radius-sm;
+  transition: background 0.15s ease, color 0.15s ease;
 
   &:hover {
-    color: $color-text-secondary;
+    color: $color-text-dark;
+    background: $color-accent-gray-pale;
 
     .sidebar-num {
       color: $color-accent-orange;
@@ -51,7 +66,9 @@
   }
 
   &.active {
-    color: $color-text-secondary;
+    color: $color-text-dark;
+    background: linear-gradient(90deg, rgba(244, 95, 0, 0.09), rgba(250, 152, 25, 0.05));
+    box-shadow: inset 2px 0 0 $color-accent-orange;
 
     .sidebar-num {
       color: $color-accent-orange;
@@ -61,12 +78,14 @@
 
 .sidebar-num {
   font-size: 10px;
-  color: $color-text-secondary;
+  color: $color-text-muted;
   letter-spacing: -0.02em;
+  transition: color 0.15s ease;
 }
 
 .sidebar-footer {
-  padding: 20px 32px 30px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid $color-divider-solid;
 
   button {
     font-family: $font-heading;
@@ -93,5 +112,6 @@
 .main-content {
   margin-left: 250px;
   flex: 1;
+  min-width: 0;
   min-height: 100vh;
 }

@@ -5,20 +5,28 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(198, 235, 247, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(250, 152, 25, 0.18) 0%, transparent 50%),
+    $color-bg-page;
+  padding: 24px;
 }
 
 .auth-card {
   width: 400px;
-  padding: 40px;
+  max-width: 100%;
+  padding: 44px 40px;
+  background: $color-bg;
   border: 1px solid $color-divider-solid;
-  border-radius: 8px;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
 
   h2 { margin-bottom: 24px; color: $color-text-dark; }
 }
 
 .btn {
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   margin-top: 8px;
   font-family: $font-heading;
   font-weight: 500;
@@ -26,10 +34,12 @@
   background: $color-text-dark;
   color: $color-bg;
   border: none;
-  border-radius: 4px;
+  border-radius: $radius-sm;
   cursor: pointer;
+  box-shadow: $shadow-sm;
 
-  &:hover { opacity: 0.85; }
+  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: $shadow-md; }
+  &:active { transform: translateY(0); }
 }
 
 .auth-error {
@@ -65,13 +75,17 @@
 
   input, select {
     width: 100%;
-    padding: 10px 12px;
+    padding: 11px 12px;
     font-size: 15px;
     font-family: $font-body;
     border: 1px solid $color-divider-solid;
-    border-radius: 4px;
+    border-radius: $radius-sm;
     outline: none;
+    background: $color-bg;
 
-    &:focus { border-color: $color-text-dark; }
+    &:focus {
+      border-color: $color-accent-orange;
+      box-shadow: 0 0 0 3px rgba(244, 95, 0, 0.1);
+    }
   }
 }

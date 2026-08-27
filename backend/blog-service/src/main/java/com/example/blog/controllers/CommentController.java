@@ -1,31 +1,56 @@
 package com.example.blog.controllers;
 
+import com.example.blog.models.Blog;
 import com.example.blog.models.Comment;
+import com.example.blog.repositories.BlogRepository;
 import com.example.blog.repositories.CommentRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/comments")
-@CrossOrigin(origins = "http://localhost:3000")
 public class CommentController {
 
     private final CommentRepository commentRepository;
+    private final BlogRepository blogRepository;
+    private final RestTemplate restTemplate;
 
-    public CommentController(CommentRepository commentRepository) {
+    @Value("${follower-service.url:http://localhost:8084}")
+    private String followerServiceUrl;
+
+    public CommentController(CommentRepository commentRepository, BlogRepository blogRepository, RestTemplate restTemplate) {
         this.commentRepository = commentRepository;
+        this.blogRepository = blogRepository;
+        this.restTemplate = restTemplate;
     }
 
     @PostMapping("/{blogId}")
-    public ResponseEntity<Comment> create(@PathVariable String blogId,
+    public ResponseEntity<?> create(@PathVariable String blogId,
                                           @RequestBody java.util.Map<String, String> body,
                                           @RequestHeader("Authorization") String authHeader) {
         Long authorId = extractUserIdFromToken(authHeader);
         String username = extractUsernameFromToken(authHeader);
+
+        Optional<Blog> blogOpt = blogRepository.findById(blogId);
+        if (blogOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Blog blog = blogOpt.get();
+
+        
+        if (!authorId.equals(blog.getAuthorId()) && !isFollowing(authorId, blog.getAuthorId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You must follow this user before commenting on their blog"));
+        }
 
         Comment comment = new Comment();
         comment.setBlogId(blogId);
@@ -37,6 +62,18 @@ public class CommentController {
 
         Comment saved = commentRepository.save(comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    private boolean isFollowing(Long followerId, Long followedId) {
+        try {
+            String url = followerServiceUrl + "/is-following/" + followerId + "/" + followedId;
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            Object following = response.getBody() != null ? response.getBody().get("following") : null;
+            return Boolean.TRUE.equals(following);
+        } catch (RestClientException e) {
+            
+            return false;
+        }
     }
 
     @GetMapping("/{blogId}")

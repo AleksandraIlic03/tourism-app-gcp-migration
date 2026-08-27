@@ -15,9 +15,12 @@ interface Blog {
   likeCount?: number;
 }
 
+const MAX_PREVIEW_IMAGES = 4;
+
 export default function Blogs() {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -111,8 +114,11 @@ export default function Blogs() {
         {blogs.length === 0 ? (
           <p>No blogs yet.</p>
         ) : (
-          blogs.map((blog) => (
-            <div key={blog.id} className="blog-card" onClick={() => navigate(`/blogs/${blog.id}`)} style={{ cursor: 'pointer' }}>
+          blogs.map((blog) => {
+            const visibleImages = blog.images.slice(0, MAX_PREVIEW_IMAGES);
+            const hiddenCount = blog.images.length - visibleImages.length;
+            return (
+            <div key={blog.id} className="blog-card blog-card--preview" onClick={() => navigate(`/blogs/${blog.id}`)} style={{ cursor: 'pointer' }}>
               <div className="blog-card-wrapper">
                 <div className="blog-card-content">
                   <h3>{blog.title}</h3>
@@ -120,10 +126,19 @@ export default function Blogs() {
                   <div className="blog-content">
                     <ReactMarkdown>{blog.description}</ReactMarkdown>
                   </div>
-                  {blog.images.length > 0 && (
+                  {visibleImages.length > 0 && (
                     <div className="blog-images">
-                      {blog.images.map((url, i) => (
-                        <img key={i} src={url} alt={`blog-img-${i}`} />
+                      {visibleImages.map((url, i) => (
+                        <div
+                          key={i}
+                          className="blog-image-thumb"
+                          onClick={(e) => { e.stopPropagation(); setLightboxSrc(url); }}
+                        >
+                          <img src={url} alt={`blog-img-${i}`} />
+                          {i === visibleImages.length - 1 && hiddenCount > 0 && (
+                            <span className="blog-image-more">+{hiddenCount}</span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -139,9 +154,15 @@ export default function Blogs() {
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
+      {lightboxSrc && (
+        <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
+          <img className="lightbox-img" src={lightboxSrc} alt="preview" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </>
   );
 }

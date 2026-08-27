@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,9 +19,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 
+	"crypto/tls"
+
 	"api-gateway/proto"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -29,6 +33,13 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func grpcTransportCredentials() credentials.TransportCredentials {
+	if os.Getenv("GRPC_TLS_ENABLED") == "true" {
+		return credentials.NewTLS(&tls.Config{})
+	}
+	return insecure.NewCredentials()
 }
 
 func verifyJWT(tokenString string, secret []byte) (map[string]interface{}, error) {
@@ -112,43 +123,71 @@ func jsonError(w http.ResponseWriter, code int, msg string) {
 func jsonUnauthorized(w http.ResponseWriter, msg string) { jsonError(w, http.StatusUnauthorized, msg) }
 func jsonForbidden(w http.ResponseWriter, msg string)    { jsonError(w, http.StatusForbidden, msg) }
 
+var allowedOrigins []string
+
+func resolveAllowedOrigins() []string {
+	raw := getEnv("ALLOWED_ORIGINS", "http://localhost:3000")
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
+}
+
+func originAllowed(origin string) bool {
+	for _, o := range allowedOrigins {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func setCORSHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin != "" && originAllowed(origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Max-Age", "3600")
+}
+
 type corsWriter struct {
 	http.ResponseWriter
+	req         *http.Request
 	wroteHeader bool
 }
 
-func (c *corsWriter) setCORS() {
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "*")
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-	c.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+func (c *corsWriter) ensureCORS() {
+	if !c.wroteHeader {
+		setCORSHeaders(c.ResponseWriter, c.req)
+		c.wroteHeader = true
+	}
 }
 
 func (c *corsWriter) WriteHeader(status int) {
-	if !c.wroteHeader {
-		c.setCORS()
-		c.wroteHeader = true
-	}
+	c.ensureCORS()
 	c.ResponseWriter.WriteHeader(status)
 }
 
 func (c *corsWriter) Write(b []byte) (int, error) {
-	if !c.wroteHeader {
-		c.setCORS()
-		c.wroteHeader = true
-	}
+	c.ensureCORS()
 	return c.ResponseWriter.Write(b)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			setCORSHeaders(w, r)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		next.ServeHTTP(&corsWriter{ResponseWriter: w}, r)
+		next.ServeHTTP(&corsWriter{ResponseWriter: w, req: r}, r)
 	})
 }
 
@@ -183,6 +222,23 @@ func newReverseProxy(target string) *httputil.ReverseProxy {
 		log.Fatalf("Invalid target URL %s: %v", target, err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+	defaultDirector := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		defaultDirector(r)
+
+		r.Host = targetURL.Host
+
+		if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			r.Header.Set("X-Forwarded-For", clientIP)
+		} else {
+			r.Header.Del("X-Forwarded-For")
+		}
+		r.Header.Del("Forwarded")
+		r.Header.Del("Origin")
+		r.Header.Del("Referer")
+	}
+
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("Proxy error for %s: %v", r.URL.Path, err)
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
@@ -338,15 +394,15 @@ func handleStartExecutionGRPC(w http.ResponseWriter, r *http.Request, client pro
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":              e.Id,
-		"tourId":          e.TourId,
-		"touristId":       e.TouristId,
-		"touristUsername": e.TouristUsername,
-		"status":          e.Status,
-		"startedAt":       e.StartedAt,
-		"lastActivity":    e.LastActivity,
-		"currentLat":      e.CurrentLat,
-		"currentLng":      e.CurrentLng,
+		"id":                 e.Id,
+		"tourId":             e.TourId,
+		"touristId":          e.TouristId,
+		"touristUsername":    e.TouristUsername,
+		"status":             e.Status,
+		"startedAt":          e.StartedAt,
+		"lastActivity":       e.LastActivity,
+		"currentLat":         e.CurrentLat,
+		"currentLng":         e.CurrentLng,
 		"completedKeypoints": e.CompletedKeypoints,
 	})
 }
@@ -385,16 +441,16 @@ func handleGetExecutionGRPC(w http.ResponseWriter, r *http.Request, client proto
 	e := resp.Execution
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":              e.Id,
-		"tourId":          e.TourId,
-		"touristId":       e.TouristId,
-		"touristUsername": e.TouristUsername,
-		"status":          e.Status,
-		"startedAt":       e.StartedAt,
-		"endedAt":         e.EndedAt,
-		"lastActivity":    e.LastActivity,
-		"currentLat":      e.CurrentLat,
-		"currentLng":      e.CurrentLng,
+		"id":                 e.Id,
+		"tourId":             e.TourId,
+		"touristId":          e.TouristId,
+		"touristUsername":    e.TouristUsername,
+		"status":             e.Status,
+		"startedAt":          e.StartedAt,
+		"endedAt":            e.EndedAt,
+		"lastActivity":       e.LastActivity,
+		"currentLat":         e.CurrentLat,
+		"currentLng":         e.CurrentLng,
 		"completedKeypoints": e.CompletedKeypoints,
 	})
 }
@@ -553,6 +609,8 @@ func handleCheckoutGRPC(w http.ResponseWriter, r *http.Request, client proto.Pay
 }
 
 func main() {
+	allowedOrigins = resolveAllowedOrigins()
+
 	port := getEnv("PORT", "8080")
 	jwtSecret := []byte(getEnv("JWT_SECRET", "mysupersecretkey123"))
 
@@ -561,9 +619,9 @@ func main() {
 	toursHTTP := getEnv("TOUR_SERVICE_URL", "http://tour-service:8083")
 	follower := getEnv("FOLLOWER_SERVICE_URL", "http://follower-service:8084")
 	payment := getEnv("PAYMENT_SERVICE_URL", "http://payment-service:8086")
-	toursGRPC := getEnv("TOUR_SERVICE_GRPC_URL", "tour-service:9090")
-	paymentGRPCAddr := getEnv("PAYMENT_SERVICE_GRPC_URL", "payment-service:9091")
-	followerGRPCAddr := getEnv("FOLLOWER_SERVICE_GRPC_URL", "follower-service:9084")
+	toursGRPC := getEnv("TOUR_SERVICE_GRPC_URL", "tour-service:8083")
+	paymentGRPCAddr := getEnv("PAYMENT_SERVICE_GRPC_URL", "payment-service:8086")
+	followerGRPCAddr := getEnv("FOLLOWER_SERVICE_GRPC_URL", "follower-service:8084")
 
 	stakeholdersProxy := newReverseProxy(stakeholders)
 	blogProxy := newReverseProxy(blog)
@@ -573,7 +631,7 @@ func main() {
 
 	conn, err := grpc.NewClient(
 		toursGRPC,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to tour-service gRPC: %v", err)
@@ -584,7 +642,7 @@ func main() {
 
 	paymentGrpcConn, err := grpc.NewClient(
 		paymentGRPCAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to payment-service gRPC: %v", err)
@@ -594,7 +652,7 @@ func main() {
 
 	followerGrpcConn, err := grpc.NewClient(
 		followerGRPCAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(grpcTransportCredentials()),
 	)
 	if err != nil {
 		log.Fatalf("Failed to connect to follower-service gRPC: %v", err)

@@ -137,9 +137,10 @@ export default function TourDetail() {
   const [kpImagePreview, setKpImagePreview] = useState('');
   const [showRoute, setShowRoute] = useState(true);
 
-  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', visitDate: new Date().toISOString().split('T')[0], images: [] as string[] });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '', visitDate: new Date().toISOString().split('T')[0], images: [] as string[] });
   const [reviewImagePreviews, setReviewImagePreviews] = useState<string[]>([]);
   const [reviewError, setReviewError] = useState('');
+  const [hoverRating, setHoverRating] = useState(0);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -418,10 +419,11 @@ export default function TourDetail() {
 
   const handleAddReview = async () => {
     setReviewError('');
+    if (reviewForm.rating < 1) { setReviewError('Please select a rating'); return; }
     if (!reviewForm.comment.trim()) { setReviewError('Comment cannot be empty'); return; }
     try {
       await api.post(`/tours/${id}/reviews`, reviewForm);
-      setReviewForm({ rating: 5, comment: '', visitDate: new Date().toISOString().split('T')[0], images: [] });
+      setReviewForm({ rating: 0, comment: '', visitDate: new Date().toISOString().split('T')[0], images: [] });
       setReviewImagePreviews([]);
       fetchReviews();
     } catch (err: any) {
@@ -493,19 +495,25 @@ export default function TourDetail() {
 
           <p className="tour-detail-description">{tour.description}</p>
 
-          <div className="tour-detail-section">
-            <span className="tour-detail-label">Tags</span>
-            <div className="tour-tags">
-              {(tour.tags ?? []).map((tag, i) => <span key={i}>#{tag}</span>)}
-            </div>
-          </div>
-
-          {(tour.lengthKm !== undefined && tour.lengthKm > 0) && (
+          <div className="tour-detail-meta-row">
             <div className="tour-detail-section">
-              <span className="tour-detail-label">Length</span>
-              <span className="tour-detail-value">{tour.lengthKm} km</span>
+              <span className="tour-detail-label">Tags</span>
+              {(tour.tags ?? []).length > 0 ? (
+                <div className="tour-tags">
+                  {(tour.tags ?? []).map((tag, i) => <span key={i}>#{tag}</span>)}
+                </div>
+              ) : (
+                <span className="tour-detail-value tour-detail-value--muted">None yet</span>
+              )}
             </div>
-          )}
+
+            {(tour.lengthKm !== undefined && tour.lengthKm > 0) && (
+              <div className="tour-detail-section">
+                <span className="tour-detail-label">Length</span>
+                <span className="tour-detail-value">{tour.lengthKm} km</span>
+              </div>
+            )}
+          </div>
 
           <div className="tour-detail-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -642,9 +650,11 @@ export default function TourDetail() {
             <div className="kp-form">
               <h3 className="kp-form-title">New Key Point</h3>
               <p className="kp-coords">Position: {kpForm.lat.toFixed(5)}, {kpForm.lng.toFixed(5)}</p>
-              <input className="kp-input" placeholder="Name *" value={kpForm.name} onChange={e => setKpForm(p => ({ ...p, name: e.target.value }))} />
-              <input className="kp-input" placeholder="Description *" value={kpForm.description} onChange={e => setKpForm(p => ({ ...p, description: e.target.value }))} />
-              <label className="kp-file-label">Image<input type="file" accept="image/*" className="kp-file-input" onChange={e => handleKpImageFile(e.target.files?.[0] || null)} /></label>
+              <label className="kp-field-label">Name *</label>
+              <input className="kp-input" placeholder="e.g. Kalemegdan Fortress" value={kpForm.name} onChange={e => setKpForm(p => ({ ...p, name: e.target.value }))} />
+              <label className="kp-field-label">Description *</label>
+              <input className="kp-input" placeholder="What makes this spot worth visiting?" value={kpForm.description} onChange={e => setKpForm(p => ({ ...p, description: e.target.value }))} />
+              <label className="kp-file-label">Image (optional)<input type="file" accept="image/*" className="kp-file-input" onChange={e => handleKpImageFile(e.target.files?.[0] || null)} /></label>
               {kpImagePreview && <img src={kpImagePreview} alt="preview" className="kp-img-preview" />}
               {kpError && <p className="form-error">{kpError}</p>}
               <div className="kp-form-actions">
@@ -663,9 +673,11 @@ export default function TourDetail() {
                   {editingKpId === kp.id ? (
                     <>
                       <h3 className="kp-form-title">Edit Key Point</h3>
-                      <input className="kp-input" placeholder="Name *" value={kpForm.name} onChange={e => setKpForm(p => ({ ...p, name: e.target.value }))} />
-                      <input className="kp-input" placeholder="Description *" value={kpForm.description} onChange={e => setKpForm(p => ({ ...p, description: e.target.value }))} />
-                      <label className="kp-file-label">Image<input type="file" accept="image/*" className="kp-file-input" onChange={e => handleKpImageFile(e.target.files?.[0] || null)} /></label>
+                      <label className="kp-field-label">Name *</label>
+                      <input className="kp-input" placeholder="e.g. Kalemegdan Fortress" value={kpForm.name} onChange={e => setKpForm(p => ({ ...p, name: e.target.value }))} />
+                      <label className="kp-field-label">Description *</label>
+                      <input className="kp-input" placeholder="What makes this spot worth visiting?" value={kpForm.description} onChange={e => setKpForm(p => ({ ...p, description: e.target.value }))} />
+                      <label className="kp-file-label">Image (optional)<input type="file" accept="image/*" className="kp-file-input" onChange={e => handleKpImageFile(e.target.files?.[0] || null)} /></label>
                       {kpImagePreview && <img src={kpImagePreview} alt="preview" className="kp-img-preview" />}
                       <p className="kp-coords" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Position: {kpForm.lat.toFixed(5)}, {kpForm.lng.toFixed(5)}</span>
@@ -722,13 +734,23 @@ export default function TourDetail() {
               <h3 className="kp-form-title">Leave a Review</h3>
               <div className="review-rating-row">
                 <label className="review-rating-label">Rating</label>
-                <div className="star-picker">
+                <div className="star-picker" onMouseLeave={() => setHoverRating(0)}>
                   {[1, 2, 3, 4, 5].map(n => (
-                    <button key={n} className={`star-btn ${reviewForm.rating >= n ? 'star-btn--active' : ''}`} onClick={() => setReviewForm(p => ({ ...p, rating: n }))}>★</button>
+                    <button
+                      key={n}
+                      type="button"
+                      className={`star-btn ${(hoverRating || reviewForm.rating) >= n ? 'star-btn--active' : ''}`}
+                      onMouseEnter={() => setHoverRating(n)}
+                      onClick={() => setReviewForm(p => ({ ...p, rating: n }))}
+                      aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                    >★</button>
                   ))}
                 </div>
+                <span className="star-picker-value">{reviewForm.rating > 0 ? `${reviewForm.rating}/5` : 'Select a rating'}</span>
               </div>
+              <label className="review-field-label">Comment</label>
               <textarea className="review-textarea" placeholder="Your comment..." value={reviewForm.comment} onChange={e => setReviewForm(p => ({ ...p, comment: e.target.value }))} />
+              <label className="review-field-label">Visited on</label>
               <input className="kp-input" type="date" value={reviewForm.visitDate} onChange={e => setReviewForm(p => ({ ...p, visitDate: e.target.value }))} />
               <label className="kp-file-label">Images (optional)<input type="file" accept="image/*" multiple className="kp-file-input" onChange={e => handleReviewImages(e.target.files)} /></label>
               {reviewImagePreviews.length > 0 && (
@@ -742,12 +764,13 @@ export default function TourDetail() {
           )}
 
           {reviews.length === 0 ? (
-            <p className="tour-empty">No reviews yet. Be the first!</p>
+            <p className="tour-empty review-empty">★ No reviews yet — be the first!</p>
           ) : (
             <div className="review-list">
               {reviews.map(review => (
                 <div key={review.id} className="review-card">
                   <div className="review-header">
+                    <span className="review-avatar">{review.authorUsername.charAt(0).toUpperCase()}</span>
                     <span className="review-author">{review.authorUsername}</span>
                     <span className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
                     <span className="review-date">{new Date(review.createdAt).toLocaleDateString()}</span>

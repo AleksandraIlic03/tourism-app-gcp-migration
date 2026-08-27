@@ -8,14 +8,16 @@ import (
 	"follower-service/repository"
 	"follower-service/tracing"
 	"log"
-	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 )
 
@@ -33,25 +35,6 @@ func main() {
 	tracer := otel.Tracer("follower-service")
 
 	repo := repository.NewFollowerRepository(database.Driver)
-
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "9084"
-	}
-	lis, err := net.Listen("tcp", ":"+grpcPort)
-	if err != nil {
-		log.Fatalf("gRPC listen failed: %v", err)
-	}
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(otelGrpcUnaryInterceptorFollower(tracer)),
-	)
-	proto.RegisterFollowerServiceServer(grpcServer, NewFollowerGrpcServer(repo))
-	go func() {
-		log.Printf("Follower gRPC server listening on :%s", grpcPort)
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
-		}
-	}()
 
 	h := handler.NewFollowerHandler(repo)
 
@@ -86,11 +69,31 @@ func main() {
 
 	corsHandler := c.Handler(router)
 
-	httpPort := os.Getenv("PORT")
-	if httpPort == "" {
-		httpPort = "8084"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8084"
 	}
 
-	log.Printf("Follower HTTP server listening on :%s", httpPort)
-	log.Fatal(http.ListenAndServe(":"+httpPort, corsHandler))
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(otelGrpcUnaryInterceptorFollower(tracer)),
+	)
+	proto.RegisterFollowerServiceServer(grpcServer, NewFollowerGrpcServer(repo))
+
+	mixedHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+			grpcServer.ServeHTTP(w, r)
+			return
+		}
+		corsHandler.ServeHTTP(w, r)
+	}
+
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: h2c.NewHandler(http.HandlerFunc(mixedHandler), &http2.Server{}),
+	}
+
+	log.Printf("Listening on :%s (HTTP + gRPC on one handler)", port)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }

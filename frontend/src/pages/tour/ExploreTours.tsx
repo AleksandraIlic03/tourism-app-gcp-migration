@@ -103,7 +103,7 @@ export default function ExploreTours() {
                 <span className="tour-price">{tour.price === 0 ? 'Free' : `$${tour.price}`}</span>
               </div>
               <p className="tour-meta">Difficulty: {tour.difficulty}</p>
-              <p>{tour.description}</p>
+              <p className="tour-description">{tour.description}</p>
               <div className="tour-tags">
                 {tour.tags.map((tag, i) => (
                   <span key={i}>#{tag}</span>

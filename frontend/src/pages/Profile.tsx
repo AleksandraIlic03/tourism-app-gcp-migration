@@ -55,12 +55,7 @@ export default function Profile() {
       if (pictureFile) {
         const formData = new FormData();
         formData.append('picture', pictureFile);
-        const token = localStorage.getItem('token');
-        await fetch('http://localhost:8081/api/profile/picture', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
+        await api.post('/profile/picture', formData);
       }
       const res = await api.put('/profile', form);
       setProfile(res.data);

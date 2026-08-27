@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"os"
 	"strings"
 	"time"
@@ -13,9 +14,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
+
+func grpcTransportCredentials() credentials.TransportCredentials {
+	if os.Getenv("GRPC_TLS_ENABLED") == "true" {
+		return credentials.NewTLS(&tls.Config{})
+	}
+	return insecure.NewCredentials()
+}
 
 type TourGrpcServer struct {
 	proto.UnimplementedTourServiceServer
@@ -130,9 +139,9 @@ func (s *TourGrpcServer) PublishTour(ctx context.Context, req *proto.PublishTour
 func getPaymentClient() (proto.PaymentServiceGrpcClient, *grpc.ClientConn, error) {
 	addr := os.Getenv("PAYMENT_GRPC_ADDR")
 	if addr == "" {
-		addr = "payment-service:9091"
+		addr = "payment-service:8086"
 	}
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(grpcTransportCredentials()))
 	if err != nil {
 		return nil, nil, err
 	}

@@ -14,11 +14,11 @@ services:
       STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:8081
       BLOG_SERVICE_URL: http://blog-service:8082
       TOUR_SERVICE_URL: http://tour-service:8083
-      TOUR_SERVICE_GRPC_URL: tour-service:9090
+      TOUR_SERVICE_GRPC_URL: tour-service:8083
       FOLLOWER_SERVICE_URL: http://follower-service:8084
-      FOLLOWER_SERVICE_GRPC_URL: follower-service:9084
+      FOLLOWER_SERVICE_GRPC_URL: follower-service:8084
       PAYMENT_SERVICE_URL: http://payment-service:8086
-      PAYMENT_SERVICE_GRPC_URL: payment-service:9091
+      PAYMENT_SERVICE_GRPC_URL: payment-service:8086
     depends_on:
       - stakeholders-service
       - blog-service
@@ -112,13 +112,11 @@ services:
     container_name: tour-service
     ports:
       - "8083:8083"
-      - "9090:9090"
     environment:
       MONGODB_URI: mongodb://mongodb-blog:27017
       PORT: 8083
-      GRPC_PORT: 9090
       PAYMENT_SERVICE_URL: http://payment-service:8086
-      PAYMENT_GRPC_ADDR: payment-service:9091
+      PAYMENT_GRPC_ADDR: payment-service:8086
       NATS_URL: nats://nats:4222
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
@@ -137,11 +135,9 @@ services:
     container_name: payment-service
     ports:
       - "8086:8086"
-      - "9091:9091"
     environment:
       MONGODB_URI: mongodb://mongodb-payment:27017
       PORT: 8086
-      GRPC_PORT: 9091
       TOUR_SERVICE_URL: http://tour-service:8083
       NATS_URL: nats://nats:4222
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -209,13 +205,11 @@ services:
     container_name: follower-service
     ports:
       - "8084:8084"
-      - "9084:9084"
     environment:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       PORT: 8084
-      GRPC_PORT: 9084
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     depends_on:
       - neo4j
