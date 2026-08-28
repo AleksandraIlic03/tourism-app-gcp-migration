@@ -33,6 +33,13 @@ resource "google_sql_database_instance" "stakeholders_db" {
   deletion_protection = true
 }
 
+# NATS VM static IP
+resource "google_compute_address" "nats_static_ip" {
+  name    = "nats-static-ip"
+  region  = "us-central1"
+  address = "34.60.71.242"
+}
+
 # NATS VM
 resource "google_compute_instance" "nats_vm" {
   name                      = "nats-vm"
@@ -49,7 +56,7 @@ resource "google_compute_instance" "nats_vm" {
   network_interface {
     network = "default"
     access_config {
-      nat_ip = "136.111.103.170"
+      nat_ip = google_compute_address.nats_static_ip.address
     }
   }
 }
@@ -264,7 +271,7 @@ resource "google_cloud_run_v2_service" "payment_service" {
       }
       env {
         name  = "NATS_URL"
-        value = "nats://136.111.103.170:4222"
+        value = "nats://${google_compute_address.nats_static_ip.address}:4222"
       }
       env {
         name  = "TOUR_SERVICE_URL"
@@ -349,7 +356,7 @@ resource "google_cloud_run_v2_service" "tour_service" {
       }
       env {
         name  = "NATS_URL"
-        value = "nats://136.111.103.170:4222"
+        value = "nats://${google_compute_address.nats_static_ip.address}:4222"
       }
       env {
         name  = "GRPC_TLS_ENABLED"
