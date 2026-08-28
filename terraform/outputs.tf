@@ -30,7 +30,7 @@ output "follower_service_url" {
 
 output "nats_vm_ip" {
   description = "Javna IP adresa NATS VM-a"
-  value       = var.nats_vm_ip
+  value       = google_compute_address.nats_static_ip.address
 }
 
 output "cloud_sql_instance" {
