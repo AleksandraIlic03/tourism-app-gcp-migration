@@ -374,3 +374,71 @@ resource "google_cloud_run_v2_service" "tour_service" {
     }
   }
 }
+
+# Cloud Monitoring - api-gateway uptime
+locals {
+  api_gateway_host = replace(google_cloud_run_v2_service.api_gateway.uri, "https://", "")
+}
+
+resource "google_monitoring_notification_channel" "email" {
+  display_name = "Email notifications"
+  type         = "email"
+
+  labels = {
+    email_address = "anjailic03@gmail.com"
+  }
+}
+
+resource "google_monitoring_uptime_check_config" "api_gateway_uptime" {
+  display_name = "api-gateway-uptime-check"
+  timeout      = "10s"
+  period       = "300s"
+
+  http_check {
+    path         = "/"
+    port         = "443"
+    use_ssl      = true
+    validate_ssl = true
+
+    accepted_response_status_codes {
+      status_class = "STATUS_CLASS_ANY"
+    }
+  }
+
+  monitored_resource {
+    type = "uptime_url"
+    labels = {
+      project_id = "tourism-app-migration"
+      host       = local.api_gateway_host
+    }
+  }
+}
+
+resource "google_monitoring_alert_policy" "api_gateway_down" {
+  display_name = "api-gateway uptime alert"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Uptime check failed"
+
+    condition_threshold {
+      filter          = "resource.type=\"uptime_url\" AND metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND metric.label.\"check_id\"=\"${google_monitoring_uptime_check_config.api_gateway_uptime.uptime_check_id}\""
+      duration        = "0s"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 1
+
+      aggregations {
+        alignment_period     = "1200s"
+        per_series_aligner   = "ALIGN_NEXT_OLDER"
+        cross_series_reducer = "REDUCE_COUNT_FALSE"
+        group_by_fields      = ["resource.label.*"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+}
